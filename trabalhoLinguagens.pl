@@ -1,7 +1,7 @@
 % ============================================================================
 % SISTEMA DE GERENCIAMENTO DE BIBLIOTECA PESSOAL
 % ============================================================================
-% Componentes do Grupo:
+% Grupo:
 % - Vinicius Silva
 % - Gabriel Domingues
 % - Fernando Gazzana
@@ -139,8 +139,17 @@ devolver_livro(Titulo) :-
     fail.
 
 % ============================================================================
-% 4. PREDICADOS AUXILIARES UTEIS
+% 4. PREDICADOS AUXILIARES
 % ============================================================================
+
+% Regra: comparar_strings_insensivel(String1, String2)
+% Compara duas strings ignorando maiusculas/minusculas
+comparar_strings_insensivel(S1, S2) :-
+    atom_string(S1, Str1),
+    atom_string(S2, Str2),
+    string_lower(Str1, Lower1),
+    string_lower(Str2, Lower2),
+    Lower1 = Lower2.
 
 % Regra: listar_todos_livros
 % Lista todos os livros da biblioteca
@@ -216,9 +225,10 @@ processar_opcao(3) :-
 
 processar_opcao(4) :-
     nl, write('Digite o nome do autor: '),
-    read(Autor),
+    read(AutorInput),
     nl, write('=== LIVROS DO AUTOR ==='), nl,
-    (   livros_por_autor(Autor, Titulo),
+    (   livro(Titulo, Autor, _, _),
+        comparar_strings_insensivel(AutorInput, Autor),
         write('- '), write(Titulo), nl,
         fail
     ;   true
@@ -236,18 +246,24 @@ processar_opcao(5) :-
 
 processar_opcao(6) :-
     nl, write('Digite o titulo do livro: '),
-    read(Titulo),
+    read(TituloInput),
     nl,
-    (   disponivel(Titulo) ->
-        write('Livro "'), write(Titulo), write('" esta DISPONIVEL!'), nl
-    ;   write('Livro "'), write(Titulo), write('" esta EMPRESTADO!'), nl
+    (   livro(TituloReal, _, _, _),
+        comparar_strings_insensivel(TituloInput, TituloReal),
+        (   disponivel(TituloReal) ->
+            write('Livro "'), write(TituloReal), write('" esta DISPONIVEL!'), nl
+        ;   write('Livro "'), write(TituloReal), write('" esta EMPRESTADO!'), nl
+        )
+    ;   write('Livro "'), write(TituloInput), write('" nao existe na biblioteca!'), nl
     ), nl, !.
 
 processar_opcao(7) :-
     nl, write('Digite o nome da pessoa: '),
-    read(Nome),
-    nl, write('=== EMPRESTIMOS DE '), write(Nome), write(' ==='), nl,
-    (   livros_emprestados_por(Nome, Titulo),
+    read(NomeInput),
+    nl, write('=== EMPRESTIMOS DE '), write(NomeInput), write(' ==='), nl,
+    (   pessoa(NomeReal, Id),
+        comparar_strings_insensivel(NomeInput, NomeReal),
+        emprestado(Titulo, Id, _),
         write('- '), write(Titulo), nl,
         fail
     ;   true
@@ -263,29 +279,61 @@ processar_opcao(8) :-
     write('Digite a categoria: '),
     read(Categoria),
     nl,
-    inserir_livro(Titulo, Autor, Ano, Categoria), nl, !.
+    (   livro(TituloExistente, _, _, _),
+        comparar_strings_insensivel(Titulo, TituloExistente) ->
+        write('Erro: Livro "'), write(TituloExistente), write('" ja existe na biblioteca!'), nl
+    ;   assertz(livro(Titulo, Autor, Ano, Categoria)),
+        write('Livro "'), write(Titulo), write('" inserido com sucesso!'), nl
+    ), nl, !.
 
 processar_opcao(9) :-
     nl, write('Digite o titulo do livro: '),
-    read(Titulo),
+    read(TituloInput),
     write('Digite o nome da pessoa: '),
-    read(Nome),
+    read(NomeInput),
     write('Digite a data (formato: \'AAAA-MM-DD\'): '),
     read(Data),
     nl,
-    emprestar_livro(Titulo, Nome, Data), nl, !.
+    (   livro(TituloReal, _, _, _),
+        comparar_strings_insensivel(TituloInput, TituloReal),
+        pessoa(NomeReal, Id),
+        comparar_strings_insensivel(NomeInput, NomeReal),
+        (   disponivel(TituloReal) ->
+            assertz(emprestado(TituloReal, Id, Data)),
+            write('Livro "'), write(TituloReal), write('" emprestado para '),
+            write(NomeReal), write(' em '), write(Data), nl
+        ;   write('Erro: Livro "'), write(TituloReal), write('" ja esta emprestado!'), nl
+        )
+    ;   \+ (livro(T, _, _, _), comparar_strings_insensivel(TituloInput, T)) ->
+        write('Erro: Livro "'), write(TituloInput), write('" nao existe na biblioteca!'), nl
+    ;   write('Erro: Pessoa "'), write(NomeInput), write('" nao esta cadastrada!'), nl
+    ), nl, !.
 
 processar_opcao(10) :-
     nl, write('Digite o titulo do livro: '),
-    read(Titulo),
+    read(TituloInput),
     nl,
-    devolver_livro(Titulo), nl, !.
+    (   emprestado(TituloReal, Id, Data),
+        comparar_strings_insensivel(TituloInput, TituloReal),
+        retract(emprestado(TituloReal, Id, Data)),
+        write('Livro "'), write(TituloReal), write('" devolvido com sucesso!'), nl
+    ;   livro(TituloReal, _, _, _),
+        comparar_strings_insensivel(TituloInput, TituloReal),
+        \+ emprestado(TituloReal, _, _),
+        write('Erro: Livro "'), write(TituloReal), write('" nao esta emprestado!'), nl
+    ;   write('Erro: Livro "'), write(TituloInput), write('" nao existe na biblioteca!'), nl
+    ), nl, !.
 
 processar_opcao(_) :-
     nl, write('Opcao invalida! Tente novamente.'), nl, !.
 
 % ============================================================================
-% 6. EXEMPLOS DE CONSULTAS
+% 6. EXEMPLOS DE CONSULTAS -> 
+% CONSULTAS PRECISAM SEGUIR O FORMATO: 
+% se -> pessoa('Joao Santos', 102).
+% entao -> 7. Consultar emprestimos de pessoa
+% Digite o nome da pessoa: 
+% 'Joao Santos'
 % ============================================================================
 % Para interface (SWI-Prolog):
 % ?- menu.
